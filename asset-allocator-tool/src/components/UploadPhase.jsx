@@ -58,7 +58,7 @@ export default function UploadPhase({ onUpload }) {
     <div className="phase-container upload-phase">
       <div className="phase-hero">
         <h2>Upload Live Portfolio</h2>
-        <p>Upload one or more client portfolio files. Supports single accounts, multiple accounts (NRE+NRO in one file), and joint portfolios (e.g. spouses as separate files).</p>
+        <p>Upload your client portfolio file(s) to get started.</p>
       </div>
 
       {/* Drop zone */}
@@ -78,7 +78,6 @@ export default function UploadPhase({ onUpload }) {
           <div className="drop-zone-inner">
             <div className="upload-icon">⬆</div>
             <p className="drop-label">Drop .xlsx file(s) here or click to browse</p>
-            <p className="drop-sub">Multiple files supported — e.g. upload K.xlsx and G.xlsx together for a joint review</p>
           </div>
         )}
       </div>
@@ -123,16 +122,6 @@ export default function UploadPhase({ onUpload }) {
           )}
         </div>
       )}
-
-      <div className="upload-notes">
-        <h3>Supported portfolio types</h3>
-        <ul>
-          <li><strong>Single account</strong> — one .xlsx file (e.g. MSK, LS)</li>
-          <li><strong>NRE + NRO</strong> — one .xlsx file with two portfolio sheets (e.g. SV)</li>
-          <li><strong>Joint / Spouses</strong> — two separate .xlsx files uploaded together (e.g. K + G)</li>
-          <li><strong>Any combination</strong> — upload as many files as needed; all holdings are merged</li>
-        </ul>
-      </div>
 
       <div className="phase-footer">
         <button className="btn-primary btn-large" disabled={files.length === 0} onClick={handleProceed}>

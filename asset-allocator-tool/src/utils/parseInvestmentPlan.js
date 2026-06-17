@@ -48,51 +48,66 @@ export function parseInvestmentPlan(arrayBuffer) {
   const ws = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  // Detect which column holds the goals
-  // Look at row 0: if col A has a value → FORMAT B, if col B has a value → FORMAT A
+  // Build a map of column -> account label from row 0
   const row0 = rows[0] || [];
-  const colA0 = row0[0] ? String(row0[0]).trim() : '';
-  const colB0 = row0[1] ? String(row0[1]).trim() : '';
-  const goalCol = colA0 && !colB0 ? 0 : 1; // col A (0) or col B (1)
-  const accountLabel = colA0 || colB0 || 'Main';
-
-  // Find all goal blocks: a goal name is a non-admin string
-  // followed within 3 rows by "Investible Amount" in the same column
-  const goalBlocks = [];
-  for (let r = 0; r < rows.length; r++) {
-    const v = rows[r]?.[goalCol];
-    if (!v || typeof v !== 'string') continue;
-    const s = v.trim();
-    if (!s || isAdmin(s)) continue;
-    // Check next 1-4 rows for "Investible Amount"
-    for (let look = 1; look <= 4; look++) {
-      const nv = rows[r + look]?.[goalCol];
-      if (nv && typeof nv === 'string' && nv.trim().toLowerCase() === 'investible amount') {
-        goalBlocks.push({ goalName: s, startRow: r, investRow: r + look });
-        break;
+  const columnLabels = {}; // col index -> account label
+  for (let col = 0; col < row0.length; col++) {
+    const v = row0[col];
+    if (v && typeof v === 'string') {
+      const trimmed = v.trim();
+      if (trimmed && !isAdmin(trimmed)) {
+        columnLabels[col] = trimmed;
       }
     }
   }
 
-  // Set end rows
+  // Find all goal blocks: check all columns for goals
+  const goalBlocks = []; // { goalName, col, startRow, investRow }
+  for (let col = 0; col < row0.length; col++) {
+    if (!columnLabels[col]) continue; // Skip columns without account labels
+    
+    for (let r = 0; r < rows.length; r++) {
+      const v = rows[r]?.[col];
+      if (!v || typeof v !== 'string') continue;
+      const s = v.trim();
+      if (!s || isAdmin(s)) continue;
+      // Check next 1-4 rows for "Investible Amount" in same column
+      for (let look = 1; look <= 4; look++) {
+        const nv = rows[r + look]?.[col];
+        if (nv && typeof nv === 'string' && nv.trim().toLowerCase() === 'investible amount') {
+          goalBlocks.push({ goalName: s, col, startRow: r, investRow: r + look });
+          break;
+        }
+      }
+    }
+  }
+
+  // Set end rows for each goal block
   for (let i = 0; i < goalBlocks.length; i++) {
     const next = goalBlocks[i + 1];
-    goalBlocks[i].endRow = next ? next.startRow - 1 : rows.length - 1;
+    // End row is either the next goal's start row - 1, or end of sheet
+    let endRow = rows.length - 1;
+    for (let j = i + 1; j < goalBlocks.length; j++) {
+      if (goalBlocks[j].col === goalBlocks[i].col) {
+        endRow = goalBlocks[j].startRow - 1;
+        break;
+      }
+    }
+    goalBlocks[i].endRow = endRow;
   }
 
   const goals = [];
   for (const gb of goalBlocks) {
     const fundNames = [];
-    let inFundSection = false;
+    const accountLabel = columnLabels[gb.col] || 'Main';
 
     for (let r = gb.investRow + 1; r <= gb.endRow; r++) {
-      const v = rows[r]?.[goalCol];
+      const v = rows[r]?.[gb.col];
       if (!v) continue;
       const s = String(v).trim();
       const sl = s.toLowerCase();
 
       if (sl === 'equity funds' || sl === 'debt funds' || sl === 'gold funds') {
-        inFundSection = true;
         continue;
       }
       if (isAdmin(v)) continue;
