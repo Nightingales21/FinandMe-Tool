@@ -18,6 +18,14 @@ const COLORS = ['#185FA5','#3B6D11','#BA7517','#534AB7','#993556','#0F6E56'];
 const isRetirement = name => /retirement|financial independence|fi\b/i.test(name);
 const isEducation  = name => /education|college|school|ug|pg/i.test(name);
 
+const TEMPLATES = [
+  { id: 'retirement', name: 'Retirement', desc: 'Retirement / Financial Independence', type: 'retirement' },
+  { id: 'education', name: "Ward's College Goal", desc: 'College fees — enter ward age and target college age', type: 'goal' },
+  { id: 'wedding', name: "Ward's Wedding", desc: 'Wedding cost projection', type: 'goal' },
+  { id: 'house', name: 'House Purchase', desc: 'House price projection and years to purchase', type: 'goal' },
+  { id: 'other', name: 'Other Goal', desc: 'Generic goal template', type: 'goal' },
+];
+
 const DEFAULT_RETIREMENT = {
   currentCorpus: 0, currentAge: 38, retireAge: 55, lifeExp: 90,
   monthlySip: 50000, sipStepup: 10, monthlyExpenses: 150000,
@@ -84,9 +92,9 @@ function LineChart({ id, datasets, labels, yFmt }) {
 
 // Retirement goal panel
 function RetirementPanel({ goal, mode }) {
-  const initialParams = mode === 'review' && goal.reviewCorpus != null
+  const initialParams = (mode === 'review' && goal.reviewCorpus != null)
     ? { ...DEFAULT_RETIREMENT, currentCorpus: goal.reviewCorpus }
-    : { ...DEFAULT_RETIREMENT };
+    : { ...DEFAULT_RETIREMENT, ...(goal.initialParams || {}) };
   const [p, setP] = useState(initialParams);
   const R = calcRetirement(p);
 
@@ -226,9 +234,9 @@ function RetirementPanel({ goal, mode }) {
 
 // Accumulation goal panel
 function GoalPanel({ goal, mode, color }) {
-  const initialParams = mode === 'review' && goal.reviewCorpus != null
+  const initialParams = (mode === 'review' && goal.reviewCorpus != null)
     ? { ...DEFAULT_GOAL, currentCorpus: goal.reviewCorpus }
-    : { ...DEFAULT_GOAL };
+    : { ...DEFAULT_GOAL, ...(goal.initialParams || {}) };
   const [p, setP] = useState(initialParams);
   const R = calcGoal(p);
 
@@ -372,6 +380,49 @@ export default function PlanningPhase({ reviewGoals }) {
     setActiveGoal(goals.length);
   };
 
+  const addGoalFromTemplate = (tmpl) => {
+    // tmpl: { id, name, type }
+    if (!tmpl) return;
+    let name = tmpl.name;
+    let computed = {};
+    if (tmpl.id === 'education') {
+      const wardAge = parseInt(prompt("Ward's current age", '10') || '0', 10);
+      const collegeAge = parseInt(prompt("Age when ward goes to college", '18') || '0', 10);
+      const feesNow = parseInt(prompt("Current annual college fees (₹)", '500000') || '0', 10);
+      const years = Math.max(0, collegeAge - wardAge);
+      computed.goalYear = NOW + years;
+      computed.targetToday = feesNow;
+      name = `Education — ${wardAge}yo → ${collegeAge}yo`;
+    } else if (tmpl.id === 'wedding') {
+      const wardAge = parseInt(prompt("Ward's current age", '25') || '0', 10);
+      const marryAge = parseInt(prompt("Expected marriage age", '28') || '0', 10);
+      const costNow = parseInt(prompt("Estimated cost today (₹)", '2000000') || '0', 10);
+      const years = Math.max(0, marryAge - wardAge);
+      computed.goalYear = NOW + years;
+      computed.targetToday = costNow;
+      name = `Wedding — ${wardAge}yo → ${marryAge}yo`;
+    } else if (tmpl.id === 'house') {
+      const years = parseInt(prompt("Years until purchase", '5') || '0', 10);
+      const priceNow = parseInt(prompt("Current house price (₹)", '10000000') || '0', 10);
+      computed.goalYear = NOW + years;
+      computed.targetToday = priceNow;
+      name = `House Purchase — in ${years} yrs`;
+    } else if (tmpl.id === 'retirement') {
+      name = 'Retirement / FI';
+    }
+
+    const newGoal = {
+      id: 'g' + Date.now(), name,
+      color: COLORS[goals.length % COLORS.length],
+      type: tmpl.id === 'retirement' ? 'retirement' : 'goal',
+      reviewCorpus: null,
+      // prefills used by panels if provided
+      initialParams: computed,
+    };
+    setGoals(g => [...g, newGoal]);
+    setActiveGoal(goals.length);
+  };
+
   const g = goals[activeGoal];
 
   return (
@@ -392,6 +443,23 @@ export default function PlanningPhase({ reviewGoals }) {
           </div>
         </div>
       </div>
+      {/* Template selector (Initial Planning) */}
+      {mode === 'planning' && (
+        <div className="plan-templates">
+          <h4>Start from a template</h4>
+          <div className="template-list">
+            {TEMPLATES.map(t => (
+              <div key={t.id} className="tmpl-card">
+                <div className="tmpl-name">{t.name}</div>
+                <div className="tmpl-desc">{t.desc}</div>
+                <div className="tmpl-actions">
+                  <button className="btn-small" onClick={() => addGoalFromTemplate(t)}>Use</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Goal tabs */}
       <div className="plan-goal-tabs">
